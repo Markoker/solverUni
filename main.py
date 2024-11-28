@@ -217,14 +217,38 @@ def table_notas():
     for asignatura in asignaturas:
         prob_aprobar = asignatura[2]
         prob_70 = asignatura[3]
+        media = asignatura[4]
+        nota_minima = asignatura[5]
+        nota_maxima = asignatura[6]
 
-        c = color_datos(prob_aprobar, [0, 0.2, 0.4, 0.6, 0.8])
-        prob_aprobar = colorear(f"{prob_aprobar * 100:.2f}", c)
+        if media is None:
+            media = "--"
+        else:
+            media = f"{media:.2f}"
 
-        c = color_datos(prob_70, [0, 0.2, 0.4, 0.6, 0.8])
-        prob_70 = colorear(f"{prob_70 * 100:.2f}", c)
+        if nota_minima is None:
+            nota_minima = "--"
+        else:
+            nota_minima = f"{nota_minima:.2f}"
 
-        data.append([asignatura[1], f"{asignatura[4]:.2f}", f"{asignatura[6]:.2f}", f"{asignatura[7]:.2f}", prob_aprobar, prob_70])
+        if nota_maxima is None:
+            nota_maxima = "--"
+        else:
+            nota_maxima = f"{nota_maxima:.2f}"
+
+        if prob_aprobar is None:
+            prob_aprobar = "--"
+        else:
+            c = color_datos(prob_aprobar, [0, 0.2, 0.4, 0.6, 0.8])
+            prob_aprobar = colorear(f"{prob_aprobar * 100:.2f}", c)
+
+        if prob_70 is None:
+            prob_70 = "--"
+        else:
+            c = color_datos(prob_70, [0, 0.2, 0.4, 0.6, 0.8])
+            prob_70 = colorear(f"{prob_70 * 100:.2f}", c)
+
+        data.append([asignatura[1], media, nota_minima, nota_maxima, prob_aprobar, prob_70])
 
     table = Table(headers, data, max_lens)
     print(table)
@@ -235,7 +259,7 @@ def proximas_evaluaciones():
     if len(evaluaciones) == 0:
         headers = ["No hay evaluaciones próximas"]
         max_lens = [50]
-        data = [[]]
+        data = []
 
         table = Table(headers, data, max_lens)
         print(table)
@@ -268,6 +292,99 @@ def proximas_evaluaciones():
     table = Table(headers, data, max_lens)
     print(table)
 
+def agregar_asignatura():
+    nombre = input("Ingrese el nombre de la asignatura: ")
+
+    formulas = []
+    restricciones = []
+
+    opt = 1
+
+    cancel = False
+
+    while opt:
+        print("¿Que desea hacer?")
+        print("1: Agregar formula")
+        print("2: Agregar restricción")
+        print("3: Guardar asignatura")
+        print("0: Cancelar")
+
+        opt = input("Seleccione una opción: ")
+
+        if opt == "1":
+            print("Para agregar una formula, ingrese la expresión matemática en el siguiente formato: \n"
+                            "{Variable principal} = <Expresion>\n"
+                            "Las expresiones pueden ser de la forma:\n"
+                            "  - {Variable} * <Numero decimal separado por .>\n"
+                            "  - {Variable} / <Numero decimal separado por .>\n"
+                            "  - ({Variable} + {Variable} + ... + {Variable}) * <Numero decimal separado por .>\n"
+                            "  - ({Variable} + {Variable} + ... + {Variable}) / <Numero decimal separado por .>\n"
+                            "Siempre debe haber una formula cuya variable principal sea NP\n"
+                            "Ejemplo:\n"
+                            "[Formula 1]: {NP} = {Promedio certamenes} * 0.8 + {Promedio tareas} * 0.2\n"
+                            "[Formula 2]: {Promedio certamenes} = {Certamen 1} * 0.3 + {Certamen 2} * 0.3 + {Certamen 3} * 0.4\n"
+                            "[Formula 3]: {Promedio tareas} = ({Tarea 1} + {Tarea 2}) / 2\n")
+            print("Formulas actuales:")
+            print("\n".join(formulas))
+            formula = input("Ingresar formula (0 para cancelar): ")
+
+
+            formulas.append(formula)
+        elif opt == "2":
+            print("Para agregar una restricción, ingrese la expresión matemática en el siguiente formato: \n"
+                    "Las expresiones pueden ser de la forma:\n"
+                    "  - {Variable} > <Numero decimal separado por .>\n"
+                    "  - {Variable} < <Numero decimal separado por .>\n"
+                    "  - {Variable} >= <Numero decimal separado por .>\n"
+                    "  - {Variable} <= <Numero decimal separado por .>\n"
+                    "Ejemplo:\n"
+                    "[Restricción 2]: {Promedio certamenes} > 40\n"
+                    "[Restricción 3]: {Promedio tareas} > 50\n"
+                    "* No es necesario agregar una restricción para NP\n")
+            print("Restricciones actuales:")
+            print("\n".join(restricciones))
+            restriccion = input("Ingresar restricción (0 para cancelar): ")
+            restricciones.append(restriccion)
+            continue
+        elif opt == "3":
+            break
+        else:
+            cancel = True
+            break
+
+    if cancel:
+        return
+
+    id_asignatura = bbdd.create_asignatura(nombre)
+
+    try:
+        G = generar_arbol([(formula,) for formula in formulas])
+        draw_tree(G)
+        # Loop through all the leaves of the tree and check if it is in the database
+        for node in nx.dfs_postorder_nodes(G):
+            if G.out_degree(node) == 0:
+                if not bbdd.get_evaluacion_nombre(id_asignatura, node):
+                    try:
+                        bbdd.create_evaluacion(id_asignatura, node)
+                    except:
+                        print(f"Error al crear la evaluación {node}")
+                        input()
+    except:
+        print("Hay un error en alguna de las formulas")
+        input()
+        return
+
+    for formula in formulas:
+        bbdd.create_formula(id_asignatura, formula)
+
+    for restriccion in restricciones:
+        bbdd.create_restriccion(id_asignatura, restriccion)
+
+    print("\nAsignatura agregada correctamente")
+    input("Presione enter para continuar...")
+
+
+
 bbdd = BBDD()
 
 menu_asignaturas_actuales = True
@@ -288,6 +405,8 @@ def main():
             asignaturas = bbdd.get_asignaturas_pasadas()
 
         print("Opciones:")
+        print(" A: Agregar asignatura")
+
         if menu_asignaturas_actuales:
             print(" C: Cambiar a asignaturas pasadas")
         else:
@@ -297,6 +416,10 @@ def main():
             print(f"{i + 1:>2}: Ver {asignatura[1]}")
 
         op = input("Seleccione una opción: ")
+        if op == "A" or op == "a":
+            agregar_asignatura()
+            continue
+
         if op == "C" or op == "c":
             menu_asignaturas_actuales = not menu_asignaturas_actuales
             continue
