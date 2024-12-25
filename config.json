@@ -1,0 +1,12 @@
+{
+  "nota": {
+    "aprobar": 55,
+    "minima": 0,
+    "maxima": 100,
+    "objetivo": 70
+  },
+  "optimizacion": {
+    "mode": "mismoPeso",
+    "forzarNoLineal": false,
+  }
+}

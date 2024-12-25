@@ -1,12 +1,11 @@
-import math as m
-import re
+import numpy as np
 
 def color_datos(val, threshold, reverse=False):
     colores = [167, 173, 179, 185, 149, 113, 77]
 
     if reverse:
         colores = colores[::-1]
-        
+
     for i in range(len(threshold) - 1, -1, -1):
         if val >= threshold[i]:
             c = round(i / (len(threshold) - 1) * (len(colores) - 1))
@@ -14,8 +13,16 @@ def color_datos(val, threshold, reverse=False):
     return colores[-1]
 
 
-def colorear(texto, color):             
+def colorear(texto, color):
     return f"\033[38;5;{color}m{texto}\033[0m"
+
+
+def print_bool(val):
+    if val:
+        col = 77
+    else:
+        col = 167
+    return colorear("█", col)
 
 
 def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
@@ -41,104 +48,80 @@ def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=
         print("\r")
 
 
-class Table:
-    def __init__(self, headers, data, max_lens=None):
-        self.headers = headers
-        self.data = data
-        if max_lens is not None:
-            self.max_len = max_lens
+def printEquation(matrixCoefs, Vars, vectorResults):
+    v = []
+    for i in range(len(Vars)):
+        v.append(f"{str(Vars[i]):>6}")
+    v = ", ".join(v)
+    print(f"[{v}]")
+
+    for i in range(len(matrixCoefs)):
+        row = []
+        print("[", end="")
+        for j in range(len(matrixCoefs[i])):
+            row.append(f"{f"{matrixCoefs[i][j]:.2f}":>6}")
+        row = ", ".join(row)
+        print(f"{row}] [{f"{vectorResults[i]:.2f}":>6}]")
+
+def printHistogramSuccess(success, notas):
+    # Merge the two np arrays into a single one
+    data = np.vstack((success, notas)).T 
+
+    # Sort the data by the second column
+    data = data[data[:,1].argsort()]
+
+    threshold = 5
+
+    hist = np.zeros((20,3))
+
+    for i in range(len(data)):
+        if data[i][1] > threshold:
+            threshold += 5
+
+        if data[i][0] == 1:
+             hist[int(threshold/5 - 1)][2] += 1
         else:
-            self.max_len = [len(str(h)) for h in headers]
+            hist[int(threshold/5 -1)][1] += 1
 
-        self.UL = "┌" 
-        self.UR = "┐"
-        self.DL = "└"
-        self.DR = "┘"
-        self.H = "─"
-        self.V = "│"
-        self.C = "┼"
-        self.L = "├"
-        self.R = "┤"
-        self.U = "┬"
-        self.D = "┴"
+    hist = hist/len(data)
 
-        
-        for i, column in enumerate(headers):
-            pattern = re.compile(r"\033\[38;5;\d+m(.*)\033\[0m") 
-            if pattern.match(str(column)):
-                l = len(pattern.match(str(column)).group(1))
+    m = np.max(hist[:,1] + hist[:,2])
+
+    hist = hist * 1/m 
+
+    hist = np.round(hist * 20)
+    hist[:,0] = 20 - np.sum(hist, axis=1)
+
+    for j in range(20):
+        print(f"{f'{(20-j)/20 * m:.2f}':>8} - ", end="")
+        for i in range(len(hist)):
+            if hist[i][0] > 0:
+                t = colorear("█", 235 if j % 2 == 0 else 237)
+                print(t*5, end="")
+                hist[i][0] -= 1
+            elif hist[i][1] > 0:
+                print(colorear("█", 1) + colorear("█"*4, 167), end="")
+                hist[i][1] -= 1 
             else:
-                l = len(str(column))
-            if l > self.max_len[i]:
-                if pattern.match(str(column)):
-                    # Reemplazar unicamente el texto, no los colores
-                    self.headers[i] = pattern.match(str(column)).group(1)[:self.max_len[i] - 3] + "..."
-                else:
-                    self.headers[i] = column[:self.max_len[i] - 3] + "..."
-            elif l < self.max_len[i]:
-                self.headers[i] = " " * m.ceil((self.max_len[i] - l) / 2) + str(column) + " " * m.floor((self.max_len[i] - l) / 2)
+                print(colorear("█", 2) + colorear("█"*4, 77), end="")
+                hist[i][2] -= 1 
+        print("")
 
+    print(" "*11, end="")
+    for i in range(20):
+        print(f"{i * 5:<5}", end="")
 
-
-        for i in range(len(data)):
-            for j in range(len(data[i])):
-                # Center data[i][j] in the cell
-                pattern = re.compile(r"\033\[38;5;\d+m(.*)\033\[0m")
-                if pattern.match(str(data[i][j])):
-                    l = len(pattern.match(str(data[i][j])).group(1))
-                else:
-                    l = len(str(data[i][j]))
-
-                if l > self.max_len[j]:
-                    if pattern.match(str(data[i][j])):
-                        # Reemplazar unicamente el texto, no los colores
-                        self.data[i][j] = pattern.match(str(data[i][j])).group(1)[:self.max_len[j] - 3] + "..."
-                    else:
-                        self.data[i][j] = data[i][j][:self.max_len[j] - 3] + "..."
-                elif l < self.max_len[j]:
-                    self.data[i][j] = " " * m.ceil((self.max_len[j] - l) / 2) + str(data[i][j]) + " " * m.floor((self.max_len[j] - l) / 2)
-        
-    def __str__(self):
-        table = ""
-        table += self.UL
-        for i, header in enumerate(self.headers):
-            table += self.H * (self.max_len[i] + 2)
-            if i < len(self.headers) - 1:
-                table += self.U
-        table += self.UR + "\n"
-        for i, header in enumerate(self.headers):
-            table += self.V + f" {header} "
-        table += self.V + "\n"
-        table += self.L
-        
-        for i, header in enumerate(self.headers):
-            table += self.H * (self.max_len[i] + 2)
-            if i < len(self.headers) - 1:
-                table += self.C 
-        table += self.R + "\n" 
-
-        for j, row in enumerate(self.data):
-            for i, cell in enumerate(row):
-                table += self.V + f" {cell} "
-            table += self.V + "\n"
-            if j == len(self.data) - 1:
-                break
-            table += self.L
-            for i, cell in enumerate(row):
-                table += self.H * (self.max_len[i] + 2)
-                if i < len(row) - 1:
-                    table += self.C
-            table += self.R + "\n"
-
-        table += self.DL 
-        for i, header in enumerate(self.headers):
-            table += self.H * (self.max_len[i] + 2)
-            if i < len(self.headers) - 1:
-                table += self.D 
-        table += self.DR
-
-        return table
-        
-
-
-
+def printDailyTaskPercentage(data, height=5):
+    colors = [167, 173, 179, 185, 149, 113, 77]
+    headers = ["Hoy", "30 días", "90 días", "180 días", "365 días"]
+    offset = 0
+    
+    for i in range(len(headers)):
+        if offset + len(headers[i]) > 147:
+            break
+    for i in range(height):
+        for j in range(i, len(data), height):
+            index = int(data[j] * len(colors))
+            index = min(index, len(colors) - 1)
+            print(colorear("██", colors[index]), end="")         
+        print()
